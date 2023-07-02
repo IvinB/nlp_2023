@@ -1,0 +1,47 @@
+# Endpoint Detection (Study file)
+## A lot of methodology
+## ZCR
+Zero crossing rate, literally how many times a signal crosses zero(zero amplitude) in a timeframe. Thus the value is never negative but can be 0 or positive.
+There are a lot of ways to calculate ZCR though, statistical approach, average approach etc since time frames overlap and so on.
+How it is used in endpoint detection is because noise has typically less zcr values than speech. 
+There are some negatives as you may expect. what if noise fluctuates greater than speech? so on...
+The code I used is below by the help of chatgpt.
+Did not use librosa since it was causing me headaches.
+
+import scipy.io.wavfile as wav
+import numpy as np
+
+# Load the audio file
+audio_file = "pathtoaudiofile.wav"
+sample_rate, audio = wav.read(audio_file)
+
+# Convert to mono if needed
+if audio.ndim > 1:
+    audio = audio[:, 0]  # Select the first channel
+
+# Normalize the audio
+audio = audio.astype(np.float32) / np.iinfo(audio.dtype).max
+
+# Apply ZCR-based VAD
+frame_length = 0.02  # Frame length in seconds
+frame_hop = 0.01  # Frame hop size in seconds
+zcr_threshold = 0.1  # ZCR threshold for silence
+
+frame_length_samples = int(frame_length * sample_rate)
+frame_hop_samples = int(frame_hop * sample_rate)
+
+# Compute the frame-wise ZCR (statistical approach)
+zcr = np.array([np.sum(frame[:-1] * frame[1:] < 0) / (len(frame) - 1) for frame in np.array_split(audio, len(audio) // frame_hop_samples)])
+
+# Apply the ZCR threshold to detect silence
+silence_frames = np.where(zcr < zcr_threshold)[0]
+
+# Convert frame indices to time
+frame_duration = frame_hop_samples / sample_rate
+silence_segments = [(frame * frame_hop_samples) / sample_rate for frame in silence_frames]
+
+# Print the detected silence segments with ZCR levels
+for frame, segment in zip(silence_frames, silence_segments):
+    minutes = int(segment // 60)
+    seconds = segment % 60
+    print(f"Frame {frame}: Time: {minutes:02d}:{seconds:05.2f}  ZCR value: {zcr[frame]:.5f}")
